@@ -1,0 +1,31 @@
+# Security Notes (MVP)
+
+- All actions must go through gateway; direct access blocked by k8s NetworkPolicies / compose internal network.
+- AuthN modes:
+  - `AUTH_MODE=off`
+  - `AUTH_MODE=oidc_hs256` using `OIDC_HS256_SECRET`
+  - `AUTH_MODE=oidc_rs256` using OIDC JWKS (`OIDC_JWKS_URL`, `OIDC_ISSUER`, `OIDC_AUDIENCE`)
+- `AUTH_MODE=off` requires:
+  - `ALLOW_INSECURE_AUTH_OFF=true`
+  - `ENVIRONMENT` explicitly set to `development|dev|local|test` (or running under `go test`)
+  - forbidden for `production|prod|staging|stage`
+- AuthZ includes RBAC route checks and ABAC runtime checks in gateway:
+  - actor binding (`sub == actor.id`) with elevated-role bypass
+  - tenant binding (`tenant == actor.tenant`) with elevated-role bypass
+  - domain role allow-list via `ABAC_DOMAIN_ROLES`
+- ActionCert signature binds: `intent_hash|policy_version|expires_at|nonce` (Ed25519).
+- Anti-replay via nonce (SETNX + TTL).
+- Action stream rate-limit in gateway (`RATE_LIMIT_ENABLED`, `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_WINDOW_SEC`) returns `RATE_LIMITED` and opens deduped anomaly incidents.
+- Certs must include `expires_at` (TTL) and `nonce`.
+- Idempotency via actor-scoped `idempotency_key` (DB + cache).
+- Audit is append-only (DB trigger prevents UPDATE/DELETE).
+- Critical failures open incidents (`OPEN -> ACKNOWLEDGED -> RESOLVED`) via `/v1/incidents`.
+- Compliance APIs:
+  - actor-scoped export: `/v1/compliance/export?actor_id=...` (includes subject restriction history + active count)
+  - data subject restrictions:
+    - `GET /v1/compliance/subjects/restrictions`
+    - `POST /v1/compliance/subjects/restrict`
+    - `POST /v1/compliance/subjects/unrestrict`
+  - retention run: `POST /v1/compliance/retention/run`
+- Runtime enforces active data-subject restrictions in gateway (`SUBJECT_RESTRICTED`).
+- PII minimization: audit stores hash/object ids; payloads should be masked before storage.

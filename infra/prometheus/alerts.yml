@@ -1,0 +1,78 @@
+groups:
+  - name: axiom-alerts
+    rules:
+      - alert: AxiomHighDenyRate
+        expr: |
+          sum(rate(axiom_verdict_total{verdict="DENY"}[5m]))
+            / clamp_min(sum(rate(axiom_verdict_total[5m])), 1)
+            > 0.2
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High deny rate in gateway"
+          description: "DENY verdicts exceed 20% of decisions for 10m. Investigate policy regressions or abuse."
+
+      - alert: AxiomEscrowBacklog
+        expr: axiom_gauge{name="escrow_pending"} > 25
+        for: 10m
+        labels:
+          severity: high
+        annotations:
+          summary: "Escrow backlog growing"
+          description: "Pending/approved escrows exceed 25 for 10m. Approvals or execution are lagging."
+
+      - alert: AxiomEscrowOldestPending
+        expr: axiom_gauge{name="escrow_pending_oldest_seconds"} > 900
+        for: 10m
+        labels:
+          severity: high
+        annotations:
+          summary: "Oldest escrow pending too long"
+          description: "Oldest escrow pending longer than 15 minutes."
+
+      - alert: AxiomVerifierLatencySpike
+        expr: axiom_endpoint_avg_millis{endpoint="POST /v1/verify"} > 750
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "Verifier latency spike"
+          description: "Gateway /v1/verify average latency exceeds 750ms for 5m."
+
+      - alert: AxiomPolicyApprovalStalled
+        expr: axiom_gauge{name="policy_pending_oldest_seconds"} > 3600
+        for: 15m
+        labels:
+          severity: medium
+        annotations:
+          summary: "Policy approvals stalled"
+          description: "Oldest policy approval pending for over 1 hour."
+
+      - alert: AxiomCriticalIncidentUnacknowledged
+        expr: axiom_gauge{name="incidents_unack_critical"} > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical incident unacknowledged"
+          description: "Critical/high incident has not been acknowledged within 5 minutes."
+
+      - alert: AxiomP95LatencyHigh
+        expr: axiom_latency_p95_seconds > 0.2
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: "P95 latency exceeds 200ms"
+          description: "P95 latency for {{ $labels.endpoint }} exceeds 200ms for 5m. API SLO at risk."
+
+      - alert: AxiomP99LatencyHigh
+        expr: axiom_latency_p99_seconds > 0.5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "P99 latency exceeds 500ms"
+          description: "P99 latency for {{ $labels.endpoint }} exceeds 500ms for 5m. Severe degradation."
+

@@ -1,0 +1,30 @@
+{
+  "cert_id": "33333333-3333-3333-3333-333333333333",
+  "intent_hash": "<fill-with-axiomctl-hash-intent>",
+  "policy_set_id": "finance",
+  "policy_version": "v17",
+  "claims": [
+    {"type": "Freshness", "statement": "bank_feed_age <= 30s"}
+  ],
+  "assumptions": {
+    "open_system_terms": [],
+    "uncertainty_budget": {"amount_abs": "1.00"},
+    "allowed_time_skew_sec": 10
+  },
+  "evidence": {
+    "state_snapshot_refs": [],
+    "attestations": []
+  },
+  "rollback_plan": {
+    "type": "COMPENSATING_ACTION",
+    "steps": ["reverse_payment"]
+  },
+  "expires_at": "",
+  "nonce": "<nonce>",
+  "signature": {
+    "signer": "agent-key-1",
+    "alg": "ed25519",
+    "sig": "",
+    "kid": "<kid>"
+  }
+}

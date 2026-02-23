@@ -1,0 +1,5 @@
+Dependency licenses are tracked via SBOM and upstream package metadata.
+Generate and review:
+1) `make sbom`
+2) `go list -m -json all` for module license discovery
+3) `npm ls --json` in `ui/console` for frontend dependency tree

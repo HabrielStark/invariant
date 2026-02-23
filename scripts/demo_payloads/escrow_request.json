@@ -1,0 +1,23 @@
+{
+  "tool": "openclaw.send",
+  "args": {
+    "to": "+15555550100",
+    "message": "Approve invoice settlement",
+    "amount": "100"
+  },
+  "payload": {
+    "op": "simulate",
+    "input": {
+      "invoice": "inv-escrow-001"
+    }
+  },
+  "actor_id": "agent-main",
+  "roles": [
+    "Viewer"
+  ],
+  "tenant": "acme",
+  "workspace": "finance",
+  "safety_mode": "STRICT",
+  "action_type": "TOOL_CALL",
+  "side_effecting": true
+}

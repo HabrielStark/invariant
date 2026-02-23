@@ -1,0 +1,371 @@
+services:
+  postgres:
+    image: postgres:15.8-alpine
+    environment:
+      POSTGRES_USER: axiom
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: axiom
+    restart: unless-stopped
+    networks:
+      - internal
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U axiom -d axiom" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  redis:
+    image: redis:7.2.5-alpine
+    command: [ "redis-server", "--requirepass", "${REDIS_PASSWORD}" ]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    restart: unless-stopped
+    networks:
+      - internal
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli -a \"$REDIS_PASSWORD\" ping | grep -q PONG" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.1.9
+    command:
+      - redpanda
+      - start
+      - --smp
+      - "1"
+      - --overprovisioned
+      - --memory
+      - 512M
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:9092
+    profiles: [ "kafka" ]
+    restart: unless-stopped
+    networks:
+      - internal
+    healthcheck:
+      test: [ "CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+  migrator:
+    build: ../../
+    command: [ "./migrator" ]
+    environment:
+      DATABASE_URL: postgres://axiom:${POSTGRES_PASSWORD}@postgres:5432/axiom?sslmode=disable
+      DATABASE_REQUIRE_TLS: "false"
+      DB_TENANT_SCOPE: ${DB_TENANT_SCOPE:-}
+      DB_TENANT_STATIC: ${DB_TENANT_STATIC:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - internal
+  policy:
+    build: ../../
+    command: [ "./policy" ]
+    environment:
+      ADDR: ":8082"
+      DATABASE_URL: postgres://axiom:${POSTGRES_PASSWORD}@postgres:5432/axiom?sslmode=disable
+      DATABASE_REQUIRE_TLS: "false"
+      DB_TENANT_SCOPE: ${DB_TENANT_SCOPE:-}
+      DB_TENANT_STATIC: ${DB_TENANT_STATIC:-}
+      AUTH_MODE: ${AUTH_MODE:-oidc_hs256}
+      ALLOW_INSECURE_AUTH_OFF: ${ALLOW_INSECURE_AUTH_OFF:-false}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      OIDC_HS256_SECRET: ${OIDC_HS256_SECRET}
+      OIDC_JWKS_URL: ""
+      OIDC_ISSUER: ""
+      OIDC_AUDIENCE: ""
+      AUTH_TIMEOUT_MS: "5000"
+      POLICY_AUTH_HEADER: ${POLICY_AUTH_HEADER}
+      POLICY_AUTH_TOKEN: ${POLICY_AUTH_TOKEN}
+      MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-1048576}
+      HTTP_READ_HEADER_TIMEOUT_SEC: ${HTTP_READ_HEADER_TIMEOUT_SEC:-5}
+      HTTP_READ_TIMEOUT_SEC: ${HTTP_READ_TIMEOUT_SEC:-15}
+      HTTP_WRITE_TIMEOUT_SEC: ${HTTP_WRITE_TIMEOUT_SEC:-30}
+      HTTP_IDLE_TIMEOUT_SEC: ${HTTP_IDLE_TIMEOUT_SEC:-120}
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    restart: on-failure
+    ports:
+      - "127.0.0.1:8082:8082"
+    networks:
+      - internal
+  state:
+    build: ../../
+    command: [ "./state" ]
+    environment:
+      ADDR: ":8083"
+      DATABASE_URL: postgres://axiom:${POSTGRES_PASSWORD}@postgres:5432/axiom?sslmode=disable
+      DATABASE_REQUIRE_TLS: "false"
+      DB_TENANT_SCOPE: ${DB_TENANT_SCOPE:-}
+      DB_TENANT_STATIC: ${DB_TENANT_STATIC:-}
+      AUTH_MODE: ${AUTH_MODE:-oidc_hs256}
+      ALLOW_INSECURE_AUTH_OFF: ${ALLOW_INSECURE_AUTH_OFF:-false}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      OIDC_HS256_SECRET: ${OIDC_HS256_SECRET}
+      OIDC_JWKS_URL: ""
+      OIDC_ISSUER: ""
+      OIDC_AUDIENCE: ""
+      AUTH_TIMEOUT_MS: "5000"
+      MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-1048576}
+      HTTP_READ_HEADER_TIMEOUT_SEC: ${HTTP_READ_HEADER_TIMEOUT_SEC:-5}
+      HTTP_READ_TIMEOUT_SEC: ${HTTP_READ_TIMEOUT_SEC:-15}
+      HTTP_WRITE_TIMEOUT_SEC: ${HTTP_WRITE_TIMEOUT_SEC:-30}
+      HTTP_IDLE_TIMEOUT_SEC: ${HTTP_IDLE_TIMEOUT_SEC:-120}
+      STATE_AUTH_HEADER: ${STATE_AUTH_HEADER}
+      STATE_AUTH_TOKEN: ${STATE_AUTH_TOKEN}
+      KAFKA_ENABLED: "false"
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_TOPIC: axiom.state.events
+      KAFKA_GROUP_ID: axiom-state
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    restart: on-failure
+    ports:
+      - "127.0.0.1:8083:8083"
+    networks:
+      - internal
+  verifier:
+    build: ../../
+    command: [ "./verifier" ]
+    environment:
+      ADDR: ":8081"
+      DATABASE_URL: postgres://axiom:${POSTGRES_PASSWORD}@postgres:5432/axiom?sslmode=disable
+      DATABASE_REQUIRE_TLS: "false"
+      POLICY_URL: http://policy:8082
+      STATE_URL: http://state:8083
+      SMT_ENABLED: "true"
+      SMT_BACKEND: "z3exec"
+      SMT_TIMEOUT_MS: "50"
+      Z3_PATH: /usr/bin/z3
+      AUTH_MODE: ${AUTH_MODE:-oidc_hs256}
+      ALLOW_INSECURE_AUTH_OFF: ${ALLOW_INSECURE_AUTH_OFF:-false}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      OIDC_HS256_SECRET: ${OIDC_HS256_SECRET}
+      OIDC_JWKS_URL: ""
+      OIDC_ISSUER: ""
+      OIDC_AUDIENCE: ""
+      AUTH_TIMEOUT_MS: "5000"
+      POLICY_AUTH_HEADER: ${POLICY_AUTH_HEADER}
+      POLICY_AUTH_TOKEN: ${POLICY_AUTH_TOKEN}
+      VERIFIER_AUTH_HEADER: ${VERIFIER_AUTH_HEADER}
+      VERIFIER_AUTH_TOKEN: ${VERIFIER_AUTH_TOKEN}
+      KEYSTORE_PROVIDER: ${KEYSTORE_PROVIDER:-db}
+      VAULT_ADDR: ${VAULT_ADDR:-}
+      VAULT_TOKEN: ${VAULT_TOKEN:-}
+      VAULT_NAMESPACE: ${VAULT_NAMESPACE:-}
+      VAULT_TRANSIT_MOUNT: ${VAULT_TRANSIT_MOUNT:-transit}
+      VAULT_KEY_PREFIX: ${VAULT_KEY_PREFIX:-}
+      VAULT_KEY_LOOKUP_TIMEOUT_MS: ${VAULT_KEY_LOOKUP_TIMEOUT_MS:-1500}
+      VAULT_KEY_LOOKUP_RETRIES: ${VAULT_KEY_LOOKUP_RETRIES:-1}
+      VAULT_KEY_LOOKUP_RETRY_DELAY_MS: ${VAULT_KEY_LOOKUP_RETRY_DELAY_MS:-100}
+      MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-1048576}
+      HTTP_READ_HEADER_TIMEOUT_SEC: ${HTTP_READ_HEADER_TIMEOUT_SEC:-5}
+      HTTP_READ_TIMEOUT_SEC: ${HTTP_READ_TIMEOUT_SEC:-15}
+      HTTP_WRITE_TIMEOUT_SEC: ${HTTP_WRITE_TIMEOUT_SEC:-30}
+      HTTP_IDLE_TIMEOUT_SEC: ${HTTP_IDLE_TIMEOUT_SEC:-120}
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+      policy:
+        condition: service_started
+      state:
+        condition: service_started
+    restart: on-failure
+    ports:
+      - "127.0.0.1:8081:8081"
+    networks:
+      - internal
+  mock-ontology:
+    build: ../../
+    command: [ "./mock-ontology" ]
+    environment:
+      ADDR: ":8084"
+    restart: on-failure
+    networks:
+      - internal
+  tool-mock:
+    build: ../../
+    command: [ "./tool-mock" ]
+    environment:
+      ADDR: ":8085"
+    restart: on-failure
+    networks:
+      - internal
+  openclaw:
+    image: debian:bookworm-slim
+    command:
+      - sh
+      - -lc
+      - >
+        apt-get update &&
+        apt-get install -y --no-install-recommends curl ca-certificates gnupg git &&
+        curl -fsSL https://deb.nodesource.com/setup_22.x | bash - &&
+        apt-get install -y --no-install-recommends nodejs &&
+        npm install -g openclaw@2026.2.22 &&
+        OPENCLAW_STATE_DIR=/tmp/openclaw
+        OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
+        openclaw gateway --port 18789 --bind lan --auth token --token ${OPENCLAW_GATEWAY_TOKEN} --allow-unconfigured --verbose
+    environment:
+      DEBIAN_FRONTEND: noninteractive
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-openclaw-demo-token}
+      OPENCLAW_STATE_DIR: /tmp/openclaw
+    profiles: [ "openclaw" ]
+    ports:
+      - "127.0.0.1:18789:18789"
+    restart: unless-stopped
+    networks:
+      - internal
+  openclaw-http-proxy:
+    build: ../../
+    command: [ "./openclaw-http-proxy" ]
+    environment:
+      ADDR: ":8090"
+      INVARIANT_GATEWAY_URL: http://gateway:8080
+      OPENCLAW_POLICY_SET_ID: ${OPENCLAW_POLICY_SET_ID:-finance_openclaw}
+      OPENCLAW_POLICY_VERSION: ${OPENCLAW_POLICY_VERSION:-v1}
+      OPENCLAW_SIGNER_KID: ${OPENCLAW_SIGNER_KID:-openclaw-dev-kid}
+      OPENCLAW_SIGNER_PRIVATE_KEY_B64: ${OPENCLAW_SIGNER_PRIVATE_KEY_B64:-}
+      OPENCLAW_SIGNER_PRIVATE_KEY_PATH: /app/.invariant/openclaw/dev_keys/private.key
+      OPENCLAW_DEFAULT_TENANT: ${OPENCLAW_DEFAULT_TENANT:-acme}
+      OPENCLAW_DEFAULT_WORKSPACE: ${OPENCLAW_DEFAULT_WORKSPACE:-finance}
+      OPENCLAW_DEFAULT_ROLES: ${OPENCLAW_DEFAULT_ROLES:-FinanceOperator}
+    volumes:
+      - ../../.invariant:/app/.invariant:ro
+    profiles: [ "openclaw" ]
+    depends_on:
+      gateway:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8090:8090"
+    restart: on-failure
+    networks:
+      - internal
+  openclaw-ws-node:
+    build: ../../
+    command: [ "./openclaw-ws-node" ]
+    environment:
+      OPENCLAW_WS_URL: ws://openclaw:18789
+      OPENCLAW_WS_PROTOCOL: ${OPENCLAW_WS_PROTOCOL:-3}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-openclaw-demo-token}
+      INVARIANT_GATEWAY_URL: http://gateway:8080
+      OPENCLAW_POLICY_SET_ID: ${OPENCLAW_POLICY_SET_ID:-finance_openclaw}
+      OPENCLAW_POLICY_VERSION: ${OPENCLAW_POLICY_VERSION:-v1}
+      OPENCLAW_SIGNER_KID: ${OPENCLAW_SIGNER_KID:-openclaw-dev-kid}
+      OPENCLAW_SIGNER_PRIVATE_KEY_B64: ${OPENCLAW_SIGNER_PRIVATE_KEY_B64:-}
+      OPENCLAW_SIGNER_PRIVATE_KEY_PATH: /app/.invariant/openclaw/dev_keys/private.key
+      OPENCLAW_WS_NODE_CLIENT_ID: ${OPENCLAW_WS_NODE_CLIENT_ID:-node-host}
+      OPENCLAW_WS_NODE_IDENTITY_PATH: /app/.invariant/openclaw/ws-node-identity.json
+      OPENCLAW_WS_NODE_COMMANDS: ${OPENCLAW_WS_NODE_COMMANDS:-invariant.tool.execute,invariant.agent.send}
+    volumes:
+      - ../../.invariant:/app/.invariant
+    profiles: [ "openclaw" ]
+    depends_on:
+      openclaw:
+        condition: service_started
+      gateway:
+        condition: service_started
+    restart: on-failure
+    networks:
+      - internal
+  gateway:
+    build: ../../
+    command: [ "./gateway" ]
+    environment:
+      ADDR: ":8080"
+      DATABASE_URL: postgres://axiom:${POSTGRES_PASSWORD}@postgres:5432/axiom?sslmode=disable
+      DATABASE_REQUIRE_TLS: "false"
+      DB_TENANT_SCOPE: ${DB_TENANT_SCOPE:-}
+      DB_TENANT_STATIC: ${DB_TENANT_STATIC:-}
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_DB: "0"
+      REDIS_TLS: "false"
+      REDIS_REQUIRE_TLS: "false"
+      REDIS_TLS_INSECURE: "false"
+      REDIS_ALLOW_INSECURE_TLS: "false"
+      REDIS_TLS_SERVER_NAME: ""
+      REDIS_TLS_CA_CERT_FILE: ""
+      REDIS_TLS_CERT_FILE: ""
+      REDIS_TLS_KEY_FILE: ""
+      VERIFIER_URL: http://verifier:8081
+      STATE_URL: http://state:8083
+      TOOL_URL: http://tool-mock:8085
+      ONTOLOGY_URL: http://mock-ontology:8084
+      ONTOLOGY_ADAPTER: mock
+      FOUNDRY_BASE_URL: ""
+      FOUNDRY_TOKEN: ""
+      FOUNDRY_ONTOLOGY_ID: ""
+      FOUNDRY_ALLOW_BATCH: "true"
+      FOUNDRY_ALLOW_DRY_RUN: "true"
+      FOUNDRY_ALLOW_PREVIEW: "true"
+      SHIELD_STRICT_NO_COMMIT: ${SHIELD_STRICT_NO_COMMIT:-true}
+      DEGRADED_NO_ALLOW: "true"
+      AUTH_MODE: ${AUTH_MODE:-oidc_hs256}
+      ALLOW_INSECURE_AUTH_OFF: ${ALLOW_INSECURE_AUTH_OFF:-false}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      OIDC_HS256_SECRET: ${OIDC_HS256_SECRET}
+      OIDC_JWKS_URL: ""
+      OIDC_ISSUER: ""
+      OIDC_AUDIENCE: ""
+      AUTH_TIMEOUT_MS: "5000"
+      MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-1048576}
+      HTTP_READ_HEADER_TIMEOUT_SEC: ${HTTP_READ_HEADER_TIMEOUT_SEC:-5}
+      HTTP_READ_TIMEOUT_SEC: ${HTTP_READ_TIMEOUT_SEC:-15}
+      HTTP_WRITE_TIMEOUT_SEC: ${HTTP_WRITE_TIMEOUT_SEC:-30}
+      HTTP_IDLE_TIMEOUT_SEC: ${HTTP_IDLE_TIMEOUT_SEC:-120}
+      VERIFIER_AUTH_HEADER: ${VERIFIER_AUTH_HEADER}
+      VERIFIER_AUTH_TOKEN: ${VERIFIER_AUTH_TOKEN}
+      ABAC_DOMAIN_ROLES: "finance:financeoperator,financemanager;security:securityadmin"
+      ABAC_STRICT_ACTOR_BINDING: "true"
+      AUDIT_HASH_SALT: ${AUDIT_HASH_SALT}
+      AUDIT_REDACT: ${AUDIT_REDACT:-false}
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS}
+      RETENTION_ENABLED: "false"
+      RETENTION_DAYS: "90"
+      RETENTION_INTERVAL_SEC: "3600"
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_PER_MINUTE: "240"
+      RATE_LIMIT_WINDOW_SEC: "60"
+      STATE_AUTH_HEADER: ${STATE_AUTH_HEADER}
+      STATE_AUTH_TOKEN: ${STATE_AUTH_TOKEN}
+      KEYSTORE_PROVIDER: ${KEYSTORE_PROVIDER:-db}
+      VAULT_ADDR: ${VAULT_ADDR:-}
+      VAULT_TOKEN: ${VAULT_TOKEN:-}
+      VAULT_NAMESPACE: ${VAULT_NAMESPACE:-}
+      VAULT_TRANSIT_MOUNT: ${VAULT_TRANSIT_MOUNT:-transit}
+      VAULT_KEY_PREFIX: ${VAULT_KEY_PREFIX:-}
+      VAULT_KEY_LOOKUP_TIMEOUT_MS: ${VAULT_KEY_LOOKUP_TIMEOUT_MS:-1500}
+      VAULT_KEY_LOOKUP_RETRIES: ${VAULT_KEY_LOOKUP_RETRIES:-1}
+      VAULT_KEY_LOOKUP_RETRY_DELAY_MS: ${VAULT_KEY_LOOKUP_RETRY_DELAY_MS:-100}
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+      verifier:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
