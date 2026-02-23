@@ -48,6 +48,11 @@ OpenClaw integration details and exact hook points are documented in:
 
 - `adapters/openclaw/README.md`
 
+
+### Demo GIF
+
+![OpenClaw + Invariant demo](docs/assets/openclaw-invariant-demo.gif)
+
 ### End-to-End Demo (OpenClaw -> Invariant -> Escrow -> Approve -> Allow -> Replay)
 
 ```bash
@@ -140,6 +145,8 @@ Dashboards:
 - Threat Model: `docs/threat-model-2026-02-12.md`
 - Final Audit: `docs/final-audit-2026-02-12.md`
 - Final Report: `docs/final-report.md`
+- Roadmap: `ROADMAP.md`
+- Release Notes: `docs/releases/v0.1.0.md`
 
 ## Repository Standards
 
