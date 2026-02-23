@@ -1,0 +1,29 @@
+{
+  "tool": "openclaw.send",
+  "args": {
+    "to": "+15555550100",
+    "message": "Execute invoice settlement",
+    "amount": "100"
+  },
+  "payload": {
+    "op": "simulate",
+    "input": {
+      "invoice": "inv-allow-001"
+    }
+  },
+  "actor_id": "agent-main",
+  "roles": [
+    "FinanceOperator"
+  ],
+  "tenant": "acme",
+  "workspace": "finance",
+  "safety_mode": "STRICT",
+  "action_type": "TOOL_CALL",
+  "side_effecting": true,
+  "rollback_plan": {
+    "type": "COMPENSATING_ACTION",
+    "steps": [
+      "{\"op\":\"simulate_rollback\",\"invoice\":\"inv-allow-001\"}"
+    ]
+  }
+}

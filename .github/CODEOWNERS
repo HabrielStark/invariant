@@ -1,0 +1,16 @@
+# Default owners
+* @HabrielStark
+
+# Runtime core
+/cmd/ @HabrielStark
+/pkg/ @HabrielStark
+/migrations/ @HabrielStark
+
+# OpenClaw integration
+/adapters/openclaw/ @HabrielStark
+/scripts/demo_openclaw_invariant.sh @HabrielStark
+
+# Infra and security
+/infra/ @HabrielStark
+/.github/workflows/ @HabrielStark
+/SECURITY.md @HabrielStark

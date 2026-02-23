@@ -1,0 +1,26 @@
+PolicySet        = Header, { MetaClause }, { Axiom } ;
+Header           = "policyset", Identifier, Version, ":" ;
+
+MetaClause       = DomainClause | RateLimitClause | ApprovalsClause | InvariantClause | AbacClause ;
+DomainClause     = "domain", Identifier ;
+RateLimitClause  = "rate", "limit", Number, "per", Duration, ["scope", Scope] ;
+ApprovalsClause  = "approvals", ("required", Number | "roles", RoleList | "sod", Bool | "expires_in", Duration) ;
+InvariantClause  = "invariant", Expression ;
+AbacClause       = "abac", ("allow" | "deny"), "when", Expression ;
+
+Axiom            = "axiom", Identifier, ":", WhenClause?, { RequireClause }, ElseClause? ;
+WhenClause       = "when", Expression ;
+RequireClause    = "require", Expression ;
+ElseClause       = "else", "shield(", ShieldType, [",", ShieldArgs], ")" ;
+
+Expression       = { any-non-newline } ;
+Identifier       = letter, { letter | digit | "_" | "-" } ;
+Version          = "v", digit, { digit | "." } ;
+ShieldType       = quoted-string | Identifier ;
+ShieldArgs       = { any-non-newline } ;
+
+Number           = digit, { digit | "." } ;
+Duration         = Number, ("s"|"m"|"h"|"d"|"second"|"minute"|"hour"|"day") ;
+Scope            = "actor" | "tenant" | "global" ;
+RoleList         = "[", quoted-string, { ",", quoted-string }, "]" ;
+Bool             = "true" | "false" ;

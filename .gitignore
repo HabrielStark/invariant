@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+ui/console/node_modules/
+
+# Build output
+ui/console/dist/
+ui/console/tsconfig.tsbuildinfo
+
+# Compiled binaries
+/gateway
+/verifier
+/policy
+/state
+/mock-ontology
+/tool-mock
+/axiomctl
+/migrator
+/invariant
+/openclaw-http-proxy
+/openclaw-ws-node
+
+# Coverage and test artifacts
+*.out
+*.cover
+*.test
+/coverage.html
+/state.html
+
+# Generated artifacts (reproducible via make)
+sbom-go.json
+ui/console/sbom-ui.json
+
+# IDE and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local state
+.invariant/
+.env
+*.log

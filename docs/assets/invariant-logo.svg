@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06B6D4"/>
+      <stop offset="100%" stop-color="#0891B2"/>
+    </linearGradient>
+    <linearGradient id="innerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+    <linearGradient id="checkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06B6D4"/>
+      <stop offset="50%" stop-color="#22D3EE"/>
+      <stop offset="100%" stop-color="#67E8F9"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="outerGlow">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Outer shield shape -->
+  <path d="M256 28 L456 120 L456 280 Q456 400 256 488 Q56 400 56 280 L56 120 Z"
+        fill="url(#innerGrad)" stroke="url(#shieldGrad)" stroke-width="4"/>
+
+  <!-- Inner shield border with glow -->
+  <path d="M256 56 L432 138 L432 272 Q432 380 256 460 Q80 380 80 272 L80 138 Z"
+        fill="none" stroke="url(#shieldGrad)" stroke-width="2" opacity="0.4"/>
+
+  <!-- Geometric lines forming verification pattern -->
+  <line x1="256" y1="100" x2="256" y2="200" stroke="#06B6D4" stroke-width="2" opacity="0.3"/>
+  <line x1="160" y1="180" x2="352" y2="180" stroke="#06B6D4" stroke-width="2" opacity="0.3"/>
+
+  <!-- Central verification checkmark -->
+  <g filter="url(#glow)">
+    <path d="M180 260 L230 320 L340 190"
+          fill="none" stroke="url(#checkGrad)" stroke-width="24"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Corner accent nodes -->
+  <circle cx="256" cy="100" r="6" fill="#06B6D4" opacity="0.6"/>
+  <circle cx="160" cy="180" r="4" fill="#06B6D4" opacity="0.4"/>
+  <circle cx="352" cy="180" r="4" fill="#06B6D4" opacity="0.4"/>
+
+  <!-- Bottom accent line -->
+  <line x1="200" y1="380" x2="312" y2="380" stroke="#06B6D4" stroke-width="2" opacity="0.3"/>
+  <circle cx="200" cy="380" r="3" fill="#06B6D4" opacity="0.4"/>
+  <circle cx="312" cy="380" r="3" fill="#06B6D4" opacity="0.4"/>
+</svg>

@@ -1,0 +1,38 @@
+name: Feature Request
+description: Propose an improvement to runtime assurance, integrations, or operator UX.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What user/system problem are we solving?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: What should be built?
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact Area
+      options:
+        - Runtime core (gateway/verifier/policy/state)
+        - OpenClaw integration
+        - Escrow and approvals
+        - Observability and runbooks
+        - Developer tooling/CI
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Concrete tests/conditions for done.
+    validations:
+      required: true

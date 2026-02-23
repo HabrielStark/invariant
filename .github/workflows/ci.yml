@@ -1,0 +1,170 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: 1.25.7
+
+      - name: Go Fmt Check
+        run: |
+          test -z "$(gofmt -l $(find cmd pkg -name '*.go'))"
+
+      - name: Go Vet
+        run: go vet ./...
+
+      - name: Go Mod Verify
+        run: go mod verify
+
+      - name: Go Coverage Gate (≥85%) with Race Detection
+        run: bash ./scripts/check-go-coverage.sh 85.0 coverage_all.out -race
+
+      - name: Go Vulnerability Scan
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          $(go env GOPATH)/bin/govulncheck ./...
+
+      - name: Build Services
+        run: |
+          go build ./cmd/gateway
+          go build ./cmd/verifier
+          go build ./cmd/policy
+          go build ./cmd/state
+          go build ./cmd/mock-ontology
+          go build ./cmd/tool-mock
+          go build ./cmd/axiomctl
+          go build ./cmd/migrator
+          go build ./cmd/axiomdsl-lsp
+
+      - name: GoSec Static Analysis
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.22.0
+          $(go env GOPATH)/bin/gosec -fmt text -exclude-generated ./cmd/... ./pkg/...
+
+      - name: Setup Node
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8
+        with:
+          node-version: 20
+
+      - name: Console Build
+        working-directory: ui/console
+        run: |
+          npm ci
+          npm run build
+          npm audit --omit=dev --audit-level=critical
+
+      - name: UI Initial JS Budget
+        run: ./scripts/check-ui-budget.sh
+
+      - name: SDK TS Build
+        run: make sdk-ts-build
+
+      - name: Generate Go SBOM
+        run: |
+          go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v1.8.0
+          $(go env GOPATH)/bin/cyclonedx-gomod mod -json -output sbom-go.json
+
+      - name: Generate UI SBOM
+        working-directory: ui/console
+        run: npx --yes @cyclonedx/cyclonedx-npm@1.19.0 --output-file sbom-ui.json
+
+      - name: Trivy Critical Scan
+        env:
+          TRIVY_IMAGE: aquasec/trivy:0.59.1@sha256:029e990b328d149bf0a9ffe355919041e1f86192db2df47e217f8a36dd42ceac
+        run: |
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            "$TRIVY_IMAGE" \
+            fs --scanners vuln,secret --severity CRITICAL --ignore-unfixed --exit-code 1 .
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: sbom
+          path: |
+            sbom-go.json
+            ui/console/sbom-ui.json
+
+  smoke:
+    runs-on: ubuntu-latest
+    needs: verify
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: 1.25.7
+      - name: Smoke Compose
+        run: ./scripts/smoke-compose.sh
+
+  contract:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: 1.25.7
+      - name: Contract Compose
+        run: ./scripts/contract-compose.sh
+
+  chaos:
+    runs-on: ubuntu-latest
+    needs: contract
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: 1.25.7
+      - name: Chaos Compose
+        run: ./scripts/chaos-compose.sh
+
+  perf:
+    runs-on: ubuntu-latest
+    needs: chaos
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: 1.25.7
+      - name: Perf Compose
+        run: ./scripts/perf-compose.sh
