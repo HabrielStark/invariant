@@ -9,7 +9,8 @@ ui/console/tsconfig.tsbuildinfo
 coverage.out
 coverage_all.out
 *.cover
-*.html
+/coverage.html
+/state.html
 sbom-go.json
 .DS_Store
 /gateway
