@@ -53,16 +53,30 @@ export class AxiomClient {
         return (await res.json());
     }
 }
+// Match the existing Go wire format. This is not general RFC 8785 JCS.
+function quoteCanonicalString(value) {
+    return JSON.stringify(value).replace(/[<>&\u2028\u2029]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
+}
+// Go sorts valid UTF-8 keys by code point; JS's default sort uses UTF-16 units.
+function compareCodePoints(a, b) {
+    const left = Array.from(a, char => char.codePointAt(0));
+    const right = Array.from(b, char => char.codePointAt(0));
+    for (let i = 0; i < Math.min(left.length, right.length); i++) {
+        if (left[i] !== right[i])
+            return left[i] - right[i];
+    }
+    return left.length - right.length;
+}
 export function canonicalizeJSON(value) {
     if (value === null)
         return 'null';
     if (typeof value === 'boolean')
         return value ? 'true' : 'false';
     if (typeof value === 'string')
-        return JSON.stringify(value);
+        return quoteCanonicalString(value);
     if (typeof value === 'number') {
-        if (!Number.isInteger(value)) {
-            throw new Error('floating-point JSON tokens are not allowed; use decimal strings');
+        if (!Number.isSafeInteger(value)) {
+            throw new Error('only safe integer JSON numbers are allowed; use decimal strings');
         }
         return String(value);
     }
@@ -71,8 +85,8 @@ export function canonicalizeJSON(value) {
     }
     if (typeof value === 'object') {
         const obj = value;
-        const keys = Object.keys(obj).sort();
-        const parts = keys.map(k => `${JSON.stringify(k)}:${canonicalizeJSON(obj[k])}`);
+        const keys = Object.keys(obj).sort(compareCodePoints);
+        const parts = keys.map(k => `${quoteCanonicalString(k)}:${canonicalizeJSON(obj[k])}`);
         return `{${parts.join(',')}}`;
     }
     throw new Error('unsupported json type');

@@ -7,12 +7,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"axiom/pkg/auth"
+	"axiom/pkg/httpx"
 	"axiom/pkg/models"
 )
 
@@ -83,6 +83,9 @@ func BindAndSignCert(intent models.ActionIntent, cert *models.ActionCert, signer
 	if cert == nil {
 		return fmt.Errorf("cert is nil")
 	}
+	if len(signer.PrivateKey) != ed25519.PrivateKeySize {
+		return fmt.Errorf("invalid Ed25519 private key length")
+	}
 	if cert.PolicyVersion == "" {
 		return fmt.Errorf("cert.policy_version is required")
 	}
@@ -146,7 +149,10 @@ func (c *Client) Verify(ctx context.Context, intent models.ActionIntent, cert mo
 		return models.VerifierResponse{}, err
 	}
 	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := httpx.ReadResponseBody(resp.Body)
+	if err != nil {
+		return models.VerifierResponse{}, fmt.Errorf("read response: %w", err)
+	}
 	if resp.StatusCode >= 300 {
 		return models.VerifierResponse{}, fmt.Errorf("verify failed status=%d body=%s", resp.StatusCode, string(respBody))
 	}
@@ -177,7 +183,10 @@ func (c *Client) ApproveEscrow(ctx context.Context, escrowID, approver string) (
 		return nil, err
 	}
 	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := httpx.ReadResponseBody(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
 	if resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("approve failed status=%d body=%s", resp.StatusCode, string(respBody))
 	}
@@ -204,7 +213,10 @@ func (c *Client) execute(ctx context.Context, path string, req ExecuteRequest) (
 		return models.GatewayResponse{}, err
 	}
 	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := httpx.ReadResponseBody(resp.Body)
+	if err != nil {
+		return models.GatewayResponse{}, fmt.Errorf("read response: %w", err)
+	}
 	if resp.StatusCode >= 300 {
 		return models.GatewayResponse{}, fmt.Errorf("execute failed status=%d body=%s", resp.StatusCode, string(respBody))
 	}

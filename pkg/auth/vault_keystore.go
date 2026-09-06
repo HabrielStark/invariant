@@ -2,16 +2,18 @@ package auth
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"axiom/pkg/httpx"
 )
 
 // VaultTransitKeyStore resolves Ed25519 public keys from Vault Transit.
@@ -60,7 +62,15 @@ func (s VaultTransitKeyStore) GetKey(ctx context.Context, kid string) (*KeyRecor
 	endpoint := addr + keyPath
 
 	var lastErr error
-	for attempt := 0; attempt <= s.MaxRetries; attempt++ {
+	for attempt := 0; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if attempt > 0 {
+			if err := httpx.WaitRetry(ctx, s.RetryDelay); err != nil {
+				return nil, err
+			}
+		}
 		reqCtx, cancel := context.WithTimeout(ctx, s.Timeout)
 		req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, endpoint, nil)
 		if err != nil {
@@ -75,19 +85,17 @@ func (s VaultTransitKeyStore) GetKey(ctx context.Context, kid string) (*KeyRecor
 		if err != nil {
 			cancel()
 			lastErr = err
-			if attempt < s.MaxRetries && s.RetryDelay > 0 {
-				time.Sleep(s.RetryDelay)
+			if attempt < s.MaxRetries {
 				continue
 			}
 			break
 		}
-		body, readErr := io.ReadAll(resp.Body)
+		body, readErr := httpx.ReadResponseBody(resp.Body)
 		_ = resp.Body.Close()
 		cancel()
 		if readErr != nil {
 			lastErr = readErr
-			if attempt < s.MaxRetries && s.RetryDelay > 0 {
-				time.Sleep(s.RetryDelay)
+			if attempt < s.MaxRetries && !errors.Is(readErr, httpx.ErrResponseTooLarge) {
 				continue
 			}
 			break
@@ -97,8 +105,7 @@ func (s VaultTransitKeyStore) GetKey(ctx context.Context, kid string) (*KeyRecor
 		}
 		if resp.StatusCode >= 300 {
 			lastErr = fmt.Errorf("vault transit key lookup failed status=%d", resp.StatusCode)
-			if attempt < s.MaxRetries && s.RetryDelay > 0 {
-				time.Sleep(s.RetryDelay)
+			if attempt < s.MaxRetries && (resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests) {
 				continue
 			}
 			break
@@ -158,6 +165,9 @@ func parseVaultTransitPublicKey(body []byte) ([]byte, error) {
 	pk, err := base64.StdEncoding.DecodeString(pub)
 	if err != nil {
 		return nil, fmt.Errorf("vault public key decode failed: %w", err)
+	}
+	if len(pk) != ed25519.PublicKeySize {
+		return nil, errors.New("vault public key must be 32 bytes for Ed25519")
 	}
 	return pk, nil
 }
