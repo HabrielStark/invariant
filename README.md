@@ -12,8 +12,8 @@
 <p align="center">
   <a href="https://github.com/HabrielStark/invariant/actions/workflows/ci.yml"><img src="https://github.com/HabrielStark/invariant/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
-  <img src="https://img.shields.io/badge/go-1.24+-00ADD8.svg?logo=go&logoColor=white" alt="Go 1.24+">
-  <img src="https://img.shields.io/badge/coverage-89.5%25-brightgreen.svg" alt="Coverage">
+  <img src="https://img.shields.io/badge/go-1.25+-00ADD8.svg?logo=go&logoColor=white" alt="Go 1.25+">
+  <img src="https://img.shields.io/badge/coverage-87.7%25-brightgreen.svg" alt="Coverage">
   <img src="https://img.shields.io/badge/security-gosec%20%7C%20trivy%20%7C%20govulncheck-success.svg" alt="Security">
   <img src="https://img.shields.io/badge/SBOM-CycloneDX-informational.svg" alt="SBOM">
 </p>
@@ -36,7 +36,7 @@ Invariant is a **runtime assurance kernel** that sits between an AI agent's deci
 
 ## Why Invariant?
 
-- 🔐 **Deterministic Policy Evaluation** — Canonical JSON hashing (RFC 8785), ed25519 cert verification
+- 🔐 **Deterministic Policy Evaluation** — Deterministic canonical JSON hashing ([wire format](docs/sdk.md#v011-compatibility-and-response-handling)), ed25519 cert verification
 - 🔁 **Anti-Replay & Idempotency** — Nonce + TTL replay protection, actor-scoped dedupe
 - ✍️ **Escrow Approvals** — Separation of Duties with explicit state machine
 - 📋 **Full Audit Trail** — Append-only audit records with replay endpoint
@@ -95,37 +95,14 @@ This starts all services:
 
 ### Make a Decision
 
-```bash
-curl -X POST http://localhost:8080/v1/decide \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token>" \
-  -d '{
-    "intent": {
-      "action": "transfer_funds",
-      "actor": "agent-007",
-      "target": "account-42",
-      "params": {"amount": 50000, "currency": "USD"}
-    },
-    "cert": {
-      "kid": "key-1",
-      "signature": "<ed25519-sig>",
-      "nonce": "unique-nonce-123",
-      "expires_at": "2026-03-01T00:00:00Z"
-    }
-  }'
-```
+Use the [Go or TypeScript SDK example](docs/sdk.md) to construct an `ActionIntent`,
+compute its hash and sign an `ActionCert`. Register the signer's public key before
+execution, and supply a current expiry, unique nonce and idempotency key.
 
-Response:
-```json
-{
-  "verdict": "ESCROW",
-  "decision_id": "dec-abc-123",
-  "reason": "amount_exceeds_threshold",
-  "shield": null,
-  "escrow_id": "esc-xyz-789",
-  "counterexample": null
-}
-```
+Send the signed request to `POST /v1/tool/execute` or
+`POST /v1/ontology/actions/execute`; `POST /v1/verify` verifies without executing.
+The [OpenClaw demo](adapters/openclaw/README.md) provides an end-to-end local flow.
+
 
 ---
 
@@ -171,7 +148,7 @@ make pentest-external # External black-box pentest
 ./scripts/check-go-coverage.sh 85.0 coverage_all.out -race
 ```
 
-Current coverage: **89.5%** (threshold: 85%)
+Measured coverage for packages with tests: **87.7%** (threshold: 85%)
 
 ---
 
@@ -179,7 +156,7 @@ Current coverage: **89.5%** (threshold: 85%)
 
 | Control | Implementation |
 |---------|---------------|
-| Intent Hashing | `SHA-256(canonical(intent) \| policy_version \| nonce)` (RFC 8785) |
+| Intent Hashing | `SHA-256(canonical(intent) \| policy_version \| nonce)` (Invariant wire format) |
 | Cert Verification | Ed25519 signed payload with intent hash binding |
 | Replay Protection | Redis `SETNX` nonce + TTL + monotonic sequence guard |
 | Idempotency | Actor-scoped `idempotency_key` dedupe for terminal verdicts |

@@ -7,12 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"sort"
 	"strings"
 )
 
-// CanonicalizeJSON returns a RFC 8785-compatible canonical form for a restricted JSON subset.
+// CanonicalizeJSON returns the deterministic Invariant v0.1 wire format.
+// It uses Go JSON string escaping and UTF-8 key ordering, not general RFC 8785 JCS.
 // Numbers must be integers (floats are rejected by ValidateNoJSONNumbers).
 func CanonicalizeJSON(raw json.RawMessage) ([]byte, error) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
@@ -20,6 +22,9 @@ func CanonicalizeJSON(raw json.RawMessage) ([]byte, error) {
 	var v interface{}
 	if err := dec.Decode(&v); err != nil {
 		return nil, err
+	}
+	if err := dec.Decode(new(interface{})); err != io.EOF {
+		return nil, errors.New("expected exactly one valid JSON value")
 	}
 	var buf bytes.Buffer
 	if err := canonicalizeValue(&buf, v); err != nil {
@@ -36,6 +41,9 @@ func ValidateNoJSONNumbers(raw json.RawMessage) error {
 	var v interface{}
 	if err := dec.Decode(&v); err != nil {
 		return err
+	}
+	if err := dec.Decode(new(interface{})); err != io.EOF {
+		return errors.New("expected exactly one valid JSON value")
 	}
 	if hasInvalidNumberToken(v) {
 		return errors.New("floating-point JSON tokens are not allowed; use decimal strings")
@@ -134,6 +142,9 @@ func CanonicalizeJSONAllowFloat(raw json.RawMessage) ([]byte, error) {
 	var v interface{}
 	if err := dec.Decode(&v); err != nil {
 		return nil, err
+	}
+	if err := dec.Decode(new(interface{})); err != io.EOF {
+		return nil, errors.New("expected exactly one valid JSON value")
 	}
 	var buf bytes.Buffer
 	if err := canonicalizeValueAllowFloat(&buf, v); err != nil {

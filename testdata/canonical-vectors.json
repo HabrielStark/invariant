@@ -1,0 +1,51 @@
+[
+  {
+    "name": "ascii",
+    "input": {
+      "b": 2,
+      "a": [
+        true,
+        null,
+        "hello"
+      ]
+    },
+    "canonical": "{\"a\":[true,null,\"hello\"],\"b\":2}",
+    "policy_version": "v1",
+    "nonce": "n1",
+    "hash": "1a6c0bcc8e9d8a7dea340be4a89d501d0c84ec6a7d7385f90a2fb7e2063b8bda"
+  },
+  {
+    "name": "html",
+    "input": {
+      "<key>": "<&>  "
+    },
+    "canonical": "{\"\\u003ckey\\u003e\":\"\\u003c\\u0026\\u003e\\u2028\\u2029\"}",
+    "policy_version": "v1",
+    "nonce": "n1",
+    "hash": "b2e6013ca47ceb63a902c4e26cc7861f402030e47f9430a2ecab23d67a268299"
+  },
+  {
+    "name": "unicode-order",
+    "input": {
+      "😀": "astral",
+      "": "bmp",
+      "é": "accent"
+    },
+    "canonical": "{\"é\":\"accent\",\"\":\"bmp\",\"😀\":\"astral\"}",
+    "policy_version": "v1",
+    "nonce": "n1",
+    "hash": "77332e19c7ad249514585792a561a0cef930989fd990d912c3495a0720814e07"
+  },
+  {
+    "name": "integers",
+    "input": {
+      "min": -9007199254740991,
+      "max": 9007199254740991,
+      "zero": 0
+    },
+    "canonical": "{\"max\":9007199254740991,\"min\":-9007199254740991,\"zero\":0}",
+    "policy_version": "v1",
+    "nonce": "n1",
+    "hash": "ee87102d77103f1299c58b266eccb0167e30e2770ec6dbf57d662110e48538d7"
+  }
+]

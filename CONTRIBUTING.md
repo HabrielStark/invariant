@@ -4,7 +4,9 @@ Thanks for contributing.
 
 ## Development Setup
 
-1. Install Docker, Go, and Node.js.
+1. Install Docker, Go 1.26.8 (the pinned build toolchain), and Node.js 22.
+   The module requires Go 1.25 or newer; normal Go toolchain selection downloads
+   the pinned version automatically unless `GOTOOLCHAIN=local` is set.
 2. Start local stack:
 
 ```bash

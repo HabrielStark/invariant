@@ -84,7 +84,8 @@ Build:
 
 ```bash
 cd sdk/ts
-../../ui/console/node_modules/.bin/tsc -p tsconfig.json
+npm ci
+npm test
 ```
 
 Example:
@@ -128,3 +129,32 @@ const response = await client.executeTool({
 
 console.log(response.verdict)
 ```
+
+## v0.1.1 compatibility and response handling
+
+The server retains the v0.1 canonical wire format: keys are ordered by UTF-8
+bytes, strings use Go JSON escaping (including `<`, `>`, `&`, U+2028 and U+2029),
+and intent numbers are integers. This is a project-specific format, not general
+RFC 8785 JCS. The TypeScript implementation now matches the server for valid
+Unicode strings, including supplementary-plane object keys. Shared fixtures in
+`testdata/canonical-vectors.json` test both implementations and SHA-256 hashes.
+Regenerate previously rejected TypeScript certificates for affected inputs.
+Existing valid server signatures and stored hashes retain their format.
+
+JavaScript numbers must be safe integers. Use decimal strings for fractions and
+integers outside `Number.MIN_SAFE_INTEGER` through `Number.MAX_SAFE_INTEGER`;
+JavaScript cannot recover precision already lost while parsing a large number.
+Canonical JSON helpers reject trailing documents or garbage.
+
+Go SDK and shared upstream HTTP responses are limited to 16 MiB. Oversized or
+partially read responses return an error, never a successful partial result.
+The shared HTTP helper uses a five-second timeout when no client is supplied.
+Custom clients retain their configured timeout. Retry waits honor context
+cancellation. Retry counts remain caller-controlled; do not enable retries for
+side effects unless the destination enforces idempotency. A failed response
+read does not prove that the remote operation was not executed.
+
+Vault Transit lookups share the response limit and cancellation behavior, retry
+transport/read errors, HTTP 429 and 5xx, and reject other non-success responses
+without retries. A zero retry delay means immediate retries, not disabled
+retries. Returned Ed25519 public keys must be exactly 32 bytes.

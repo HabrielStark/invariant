@@ -49,6 +49,9 @@ func SignaturePayload(cert models.ActionCert) ([]byte, error) {
 }
 
 func VerifyEd25519(pubKey ed25519.PublicKey, cert models.ActionCert) error {
+	if len(pubKey) != ed25519.PublicKeySize {
+		return errors.New("invalid Ed25519 public key length")
+	}
 	if cert.Signature.Alg != "ed25519" {
 		return errors.New("unsupported signature alg")
 	}

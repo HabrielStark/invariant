@@ -1,4 +1,4 @@
-.PHONY: test test-race build build-z3 fmt lint gosec sbom sbom-ui vuln trivy migrate dev smoke contract chaos perf self-audit bootstrap sdk-ts-build ui-budget pentest-external
+.PHONY: test test-race build build-z3 fmt lint gosec sbom sbom-ui vuln trivy migrate dev smoke contract chaos perf self-audit bootstrap sdk-ts-build sdk-ts-test ui-budget pentest-external
 TRIVY_IMAGE ?= aquasec/trivy:0.59.1@sha256:029e990b328d149bf0a9ffe355919041e1f86192db2df47e217f8a36dd42ceac
  
 build-z3:
@@ -14,7 +14,7 @@ build:
 	go build ./cmd/gateway ./cmd/verifier ./cmd/policy ./cmd/state ./cmd/mock-ontology ./cmd/tool-mock ./cmd/axiomctl ./cmd/migrator ./cmd/axiomdsl-lsp
 
 fmt:
-	gofmt -w $$(find cmd pkg -name '*.go')
+	gofmt -w $$(find cmd pkg adapters -name '*.go')
 
 lint:
 	go vet ./...
@@ -72,7 +72,10 @@ bootstrap:
 	./scripts/bootstrap.sh
 
 sdk-ts-build:
-	cd sdk/ts && ../../ui/console/node_modules/.bin/tsc -p tsconfig.json
+	cd sdk/ts && npm ci && npm run build
+
+sdk-ts-test:
+	cd sdk/ts && npm ci && npm test
 
 ui-budget:
 	./scripts/check-ui-budget.sh

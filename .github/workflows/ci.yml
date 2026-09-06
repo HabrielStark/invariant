@@ -23,11 +23,11 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          go-version: 1.25.7
+          go-version: 1.26.8
 
       - name: Go Fmt Check
         run: |
-          test -z "$(gofmt -l $(find cmd pkg -name '*.go'))"
+          test -z "$(gofmt -l $(find cmd pkg adapters -name '*.go'))"
 
       - name: Go Vet
         run: go vet ./...
@@ -63,7 +63,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Console Build
         working-directory: ui/console
@@ -75,8 +75,8 @@ jobs:
       - name: UI Initial JS Budget
         run: ./scripts/check-ui-budget.sh
 
-      - name: SDK TS Build
-        run: make sdk-ts-build
+      - name: SDK TS Build and Interoperability Tests
+        run: make sdk-ts-test
 
       - name: Generate Go SBOM
         run: |
@@ -117,7 +117,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          go-version: 1.25.7
+          go-version: 1.26.8
       - name: Smoke Compose
         run: ./scripts/smoke-compose.sh
 
@@ -133,7 +133,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          go-version: 1.25.7
+          go-version: 1.26.8
       - name: Contract Compose
         run: ./scripts/contract-compose.sh
 
@@ -149,7 +149,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          go-version: 1.25.7
+          go-version: 1.26.8
       - name: Chaos Compose
         run: ./scripts/chaos-compose.sh
 
@@ -165,6 +165,6 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          go-version: 1.25.7
+          go-version: 1.26.8
       - name: Perf Compose
         run: ./scripts/perf-compose.sh
